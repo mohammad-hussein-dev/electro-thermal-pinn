@@ -1,0 +1,16 @@
+Evaluation Metrics:
+==================================================
+Relative L2 Error:
+  E: 9.226582e-04
+  H: 6.386083e-03
+  T: 1.529097e-03
+
+Mean Absolute Error (MAE):
+  E: 2.466549e-04
+  H: 3.149789e-04
+  T: 7.700862e-04
+
+Max Absolute Error:
+  E: 5.612820e-04
+  H: 7.447898e-04
+  T: 2.032995e-03

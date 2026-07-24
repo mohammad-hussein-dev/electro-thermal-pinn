@@ -1,13 +1,21 @@
+problem:
+  L: 1.0
+  T0: 0.0
+  T1: 1.0
+  N_f: 2000          # کاهش از ۵۰۰۰ به ۲۰۰۰
+
 network:
-  layers: [1, 30, 30, 30, 1]
+  layers: [2, 50, 50, 50, 50, 3]
 
 training:
   adam_lr: 1e-3
-  adam_iters: 5000
+  adam_iters: 3000   # کاهش از ۵۰۰۰ به ۳۰۰۰
   use_lbfgs: true
 
-problem:
-  N_f: 200
-  L: 2.5 # meters
-  T0: 100.0 # C
-  T1: 300.0 # C
+inverse:
+  enable: true
+  lambda_data: 100.0 # افزایش از ۵۰ به ۱۰۰
+  n_data_points: 500
+  noise_level: 0.005
+  use_uncertainty: true
+  varying_params: true

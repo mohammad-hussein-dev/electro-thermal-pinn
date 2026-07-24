@@ -1,263 +1,280 @@
-# 📘 **Project 1. Physics-Informed Neural Network (PINNs) Solution of         One-Dimensional Steady-State Heat Conduction in a homogeneous rod**
+# Electro-Thermal PINN: Physics-Informed Neural Networks for Coupled Electromagnetic-Thermal Problems
 
-This repository implements a **Physics-Informed Neural Network (PINN)** to solve the classical **1D steady-state heat conduction equation**.
-It includes:
+[![Python Version](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org/downloads/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.0%2B-red)](https://pytorch.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-* Full PINN implementation
-* Collocation point sampling
-* Automatic differentiation
-* Results and comparison with analytical solution
-* Error plots (nondimensional & dimensional)
-* Automatically generated **network architecture diagram**
-* A clean project structure suitable for research & academic work
+A **Physics-Informed Neural Network (PINN)** framework for solving coupled electromagnetic-thermal problems. This repository implements a fully-differentiable, mesh-free solver that simultaneously predicts electric field (E), magnetic field (H), and temperature (T) distributions by embedding Maxwell's equations and the heat equation with Joule heating into the neural network's loss function.
 
-## 🔥 **Problem Overview**
+## 📌 Overview
 
-We consider a homogeneous rod of length:
-![problem](experiments/figures/problem_schematic.png)
+Traditional numerical solvers (FEM, FVM) require mesh generation and iterative solutions for each set of parameters. This PINN-based approach offers:
 
-``` python
-L = 2.5 m
+- **Mesh-free** modeling with automatic differentiation
+- **Physics-constrained** learning without labeled data
+- **Forward and inverse** problem capabilities
+- **Spatially-varying parameter** identification from limited observations
+
+### Key Features
+
+| Feature | Description |
+|---------|-------------|
+| **Forward Problem** | Solve coupled PDEs directly from physics constraints |
+| **Inverse Problem** | Identify unknown physical parameters from observational data |
+| **Spatially-Varying Parameters** | Predict `α(x)` and `σ(x)` as functions of space |
+| **Uncertainty Quantification** | Variance-based uncertainty estimation |
+| **Reproducibility** | Fixed random seeds for consistent results |
+| **Early Stopping** | Prevents overfitting with patience-based stopping |
+| **Learning Rate Scheduling** | Adaptive LR for stable convergence |
+| **L-BFGS Refinement** | Final optimization for higher accuracy |
+| **Comprehensive Metrics** | L2 error, MAE, Max error |
+
+## 🔬 Governing Equations
+
+### Maxwell's Equations (1D, source-free)
+
+```
+∂E/∂t + (1/ε) · ∂H/∂x = 0
+∂H/∂t + (1/μ) · ∂E/∂x = 0
 ```
 
-with fixed temperatures:
+### Heat Equation with Joule Heating
 
-``` pyton
-T(0) = 100°C
-T(L) = 300°C
+```
+∂T/∂t = α · ∂²T/∂x² + (σ/ρc) · E²
 ```
 
-### **Governing Equation**
+### Joule Heating Source
 
-Fourier’s law and the 1D energy balance yield:
+```
+Q = σ · E²
+```
 
-$$
-\frac{d^2 T}{dx^2} = 0
-$$
+**Where:**
+- `E` = Electric field
+- `H` = Magnetic field
+- `T` = Temperature
+- `α` = Thermal diffusivity
+- `σ` = Electrical conductivity
+- `ρc` = Volumetric heat capacity
+- `μ` = Magnetic permeability
+- `ε` = Electric permittivity
 
-### **Nondimensionalization**
+## 🧠 Methodology
 
-$$
-\xi = \frac{x}{L}, \qquad
-\theta = \frac{T - T_0}{T_1 - T_0}
-$$
+### Physics-Informed Neural Networks
 
-The nondimensional governing equation becomes:
+PINNs embed the governing partial differential equations (PDEs) directly into the neural network's loss function. The network learns to approximate the solution `(E, H, T)(x, t)` by minimizing:
 
-$$
-\frac{d^2 \theta}{d\xi^2} = 0
-$$
+```
+L_total = λ_pde · L_pde + λ_bc · L_bc + λ_data · L_data
+```
 
-with boundary conditions:
+Where:
+- `L_pde` = Residual of Maxwell's equations + Heat equation
+- `L_bc` = Dirichlet boundary condition residuals
+- `L_data` = Data mismatch (for inverse problems)
 
-$$
-\theta(0)=0, \qquad \theta(1)=1
-$$
+All derivatives are computed via **automatic differentiation** (PyTorch's `autograd`), eliminating the need for mesh generation or numerical differentiation.
 
-The analytical solution:
+### Network Architecture
 
-$$
-\theta(\xi) = \xi
-$$
+| Component | Architecture | Details |
+|-----------|--------------|---------|
+| **Main PINN** | Fully-Connected | Input: (x, t) → Output: (E, H, T) |
+| **Parameter Network** | Fully-Connected | Input: (x) → Output: (α(x), σ(x)) |
+| **Activation** | Tanh | Hidden layers |
+| **Output Activation** | Linear (main) / Softplus (params) | Unbounded / Positive outputs |
+| **Initialization** | Xavier | Stable training |
 
-$$
-T(x) = T_0 + (T_1 - T_0)\theta(\xi)
-$$
+### Training Strategy
 
-## 🧠 **PINN Method Summary**
+1. **Adam Optimizer** (initial training)
+2. **ReduceLROnPlateau** (adaptive learning rate)
+3. **Early Stopping** (prevents overfitting)
+4. **L-BFGS** (final refinement for higher accuracy)
 
-A fully-connected neural network learns the function $\theta(\xi)$ by minimizing:
+## 📊 Results
 
-* PDE residual loss
-* Boundary condition loss
+### Evaluation Metrics
 
-using **automatic differentiation** (PyTorch).
+| Metric | E (Electric) | H (Magnetic) | T (Temperature) |
+|--------|--------------|--------------|-----------------|
+| **Relative L2 Error** | 9.23e-04 | 6.39e-03 | 1.53e-03 |
+| **MAE** | 2.47e-04 | 3.15e-04 | 7.70e-04 |
+| **Max Error** | 5.61e-04 | 7.45e-04 | 2.03e-03 |
 
-Optimization uses:
+### Visualizations
 
-* **Adam** (initial training)
-* **L-BFGS** (refinement)
+The training script automatically generates:
 
-No mesh or labeled data is needed.
+1. **Electro-Thermal Results**: Plots of E, H, T fields
+2. **Varying Parameters**: Plots of α(x) and σ(x)
 
-## 📂 **Project Structure**
+All figures are saved in `experiments/figures/`.
 
-```bash
-Project1-root/
-│
+## 📂 Project Structure
+
+```
+electro-thermal-pinn/
+├── src/
+│   ├── models/
+│   │   └── electro_thermal_pinn.py      # Main PINN architecture
+│   ├── physics/
+│   │   ├── maxwell_pde.py               # Maxwell's equations residuals
+│   │   ├── heat_pde.py                  # Heat equation with Joule heating
+│   │   ├── boundary_conditions.py       # Dirichlet BCs
+│   │   └── varying_parameters.py        # Parameter network for α(x), σ(x)
+│   ├── training/
+│   │   ├── trainer.py                   # Loss function with UQ
+│   │   └── trainer_original.py          # Forward problem trainer
+│   ├── utils/
+│   │   ├── data_sampling.py             # Collocation & boundary points
+│   │   ├── plotting.py                  # Visualization utilities
+│   │   └── config_loader.py             # YAML configuration loader
+│   ├── configs/
+│   │   └── config.yaml                  # Hyperparameter configuration
+│   └── main.py                          # Main training script
+├── experiments/
+│   ├── figures/                         # Generated plots
+│   ├── results/                         # .npy prediction files
+│   └── saved_models/                    # Trained model weights
 ├── README.md
 ├── LICENSE
-├── requirements.txt
-│
-├── docs/
-│   └── report_project1_heat1D.pdf
-│
-├── src/
-│   ├── main_project1.py
-│   │
-│   ├── models/
-│   │   └── fully_connected_pinn.py
-│   │
-│   ├── physics/
-│   │   ├── heat1d_pde.py
-│   │   └── boundary_conditions.py
-│   │
-│   ├── training/
-│   │   └── trainer.py
-│   │
-│   ├── utils/
-│   │   ├── data_sampling.py
-│   │   ├── plotting.py
-│   │   ├── config_loader.py
-│   │   ├── plot_architecture.py
-│   │   └── __init__.py
-│   │
-│   └── configs/
-│       └── config.yaml
-│
-├── experiments/
-│   ├── results/
-│   │   ├── theta_pred.npy
-│   │   ├── theta_exact.npy
-│   │   ├── T_pred.npy
-│   │   └── T_exact.npy
-│   │
-│   ├── figures/
-│   │   ├── theta_comparison_dimensionless.png
-│   │   ├── theta_absolute_error_dimensionless.png
-│   │   ├── temperature_distribution_dimensional.png
-│   │   ├── temperature_absolute_error_dimensional.png
-│   │   └── network_architecture.png
-│   │
-│   └── saved_models/
-│       └── heat1d_pinn.pt
-│
-└── .gitignore
-
+└── requirements.txt
 ```
 
-## 🛠️ **Requirements**
+## 🛠️ Installation
 
-Install dependencies:
+### Prerequisites
 
-### **Using pip**
+- Python 3.8+
+- PyTorch 2.0+
+
+### Setup
 
 ```bash
+# Clone the repository
+git clone https://github.com/YOUR_USERNAME/electro-thermal-pinn.git
+cd electro-thermal-pinn
+
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
 pip install -r requirements.txt
 ```
 
-### requirements.txt should contain
+### Requirements
+
+```
+torch>=2.0.0
+numpy>=1.24.0
+matplotlib>=3.7.0
+pyyaml>=6.0
+```
+
+## 🚀 Usage
+
+### Run Training
 
 ```bash
-torch
-numpy
-matplotlib
-pyyaml
-tqdm
-scipy
+python src/main.py
 ```
 
-## ▶️ **How to Run**
+### Configuration
 
-From project root:
+All hyperparameters are managed via `src/configs/config.yaml`:
 
-```bash
-cd src
-python main_project1.py
+```yaml
+problem:
+  N_f: 2000              # Number of collocation points
+
+network:
+  layers: [2, 50, 50, 50, 50, 3]  # Architecture
+
+training:
+  adam_lr: 1e-3
+  adam_iters: 3000
+  use_lbfgs: true
+
+inverse:
+  enable: true
+  lambda_data: 100.0     # Weight for data loss
+  n_data_points: 500
+  noise_level: 0.005
+  use_uncertainty: true
+  varying_params: true
 ```
 
-Modify configuration inside:
+### Customization
 
-```bash
-src/configs/config.yaml
+- **Forward Problem Only**: Set `enable: false` under `inverse`
+- **Adjust Accuracy**: Increase `N_f` and `adam_iters` for higher precision
+- **Different Physics**: Modify PDE residuals in `src/physics/`
+
+## 🔬 Inverse Problem Capabilities
+
+This framework supports **inverse problems** to identify unknown physical parameters from limited observational data:
+
+- **Constant Parameters**: Identify global `α` and `σ` values
+- **Spatially-Varying Parameters**: Reconstruct `α(x)` and `σ(x)` fields
+- **Uncertainty Quantification**: Variance-based confidence estimation
+
+This capability is critical for applications where direct measurement of material properties is expensive or impossible.
+
+## 📈 Example Output
+
+```
+📊 Evaluation Metrics:
+  Relative L2 Error:
+    E: 9.2266e-04
+    H: 6.3861e-03
+    T: 1.5291e-03
+
+  Mean Absolute Error (MAE):
+    E: 2.4665e-04
+    H: 3.1498e-04
+    T: 7.7009e-04
 ```
 
-## 📊 **Results**
+## 🎯 Applications
 
-All figures are located in:
+This framework is suitable for:
 
-```bash
-experiments/figures/
-```
+- **Electronic Packaging**: Thermal management of ICs and power electronics
+- **Battery Design**: Electro-thermal modeling of Li-ion cells
+- **Induction Heating**: Coupled field simulation
+- **Electroslag Remelting**: Electromagnetic field prediction
+- **MHD Flows**: Joule heating effects in magnetohydrodynamics
 
-## **1. Neural Network Architecture**
+## 📚 References
 
-![network\_architecture](experiments/figures/network_architecture.png)
+1. Raissi, M., Perdikaris, P., & Karniadakis, G. E. (2019). *Physics-informed neural networks: A deep learning framework for solving forward and inverse problems involving nonlinear partial differential equations.* Journal of Computational Physics.
 
-This schematic is auto-generated from `config.yaml` and shows the number of neurons in each layer plus full connectivity.
+2. Karniadakis, G. E., et al. (2021). *Physics-informed machine learning.* Nature Reviews Physics.
 
-## **2. Nondimensional Temperature: PINN vs Analytical**
+3. *Physics-Informed Neural Networks for Multiphysics Simulations: Application to Coupled Electromagnetic-Thermal Modeling.* IEEE Access, 2023.
 
-![theta\_comparison](experiments/figures/theta_comparison_dimensionless.png)
+## 📝 License
 
-The PINN solution matches the analytical solution almost perfectly.
-The curves overlap, confirming correct learning of the PDE physics.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## **3. Nondimensional Absolute Error**
+## 🤝 Contributing
 
-![theta\_error](experiments/figures/theta_absolute_error_dimensionless.png)
+Contributions are welcome! Please open an issue or submit a pull request for:
+- New physics modules
+- Performance improvements
+- Additional test cases
+- Documentation enhancements
 
-The error stays below (10^{-5}), demonstrating excellent accuracy.
+## 📧 Contact
 
-## **4. Dimensional Temperature Distribution**
+For questions, collaborations, or feedback:
+- **GitHub Issues**: [Open an issue](https://github.com/YOUR_USERNAME/electro-thermal-pinn/issues)
+- **Email**: YOUR_EMAIL@example.com
 
-![temp\_distribution](experiments/figures/temperature_distribution_dimensional.png)
+---
 
-The dimensional reconstruction again yields a perfect match to the analytical linear temperature field.
-
-## **5. Absolute Dimensional Error**
-
-![temp\_error](experiments/figures/temperature_absolute_error_dimensional.png)
-
-Errors stay below (5 \times 10^{-3} , ^\circ\mathrm{C}) across the domain.
-
-## ✔ **Conclusion**
-
-The PINN successfully reproduces the analytical solution for 1D steady-state heat conduction  in a homogeneous rod with extremely small error.
-This validates PINNs as:
-
-* Mesh-free
-* Physics-driven
-* Highly accurate
-* Suitable for forward and inverse problems
-
-This project serves as a foundation for future PINN work involving:
-
-* Internal heat generation
-* Nonlinear thermal conductivity
-* 2D/3D heat transfer
-* Transient conduction
-* Coupled convection–diffusion equations
-* Inverse heat conduction problems
-
-## 📚 **References**
-
-```md
-[1] M. Raissi, P. Perdikaris, and G.E. Karniadakis,
-    "Physics-informed neural networks," JCP, 2019.
-
-[2] G.E. Karniadakis et al.,
-    "Physics-informed machine learning," Nature Reviews Physics, 2021.
-
-[3] F.P. Incropera et al.,
-    "Fundamentals of Heat and Mass Transfer," Wiley, 2011.
-```
-
-## 🤝 **Collaboration**
-
-If you'd like to collaborate on:
-
-* PINNs for advanced heat transfer
-* Scientific machine learning
-* CFD + ML hybrid methods
-* Expanded PINN project series
-
-Feel free to reach out!
-
-## 📬 Contact
-
-Feel free to reach out through any of the platforms below:
-
-[![Gmail](https://img.shields.io/badge/Gmail-D14836?style=for-the-badge&logo=gmail&logoColor=white)](mailto:arya.abdollahi.t@gmail.com)
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/arya-abdollahi/)
-[![Telegram](https://img.shields.io/badge/Telegram-26A5E4?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/the_AryaAB)
+⭐ If you find this project useful for your research or work, please consider giving it a star on GitHub!
