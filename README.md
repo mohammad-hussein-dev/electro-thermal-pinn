@@ -273,7 +273,7 @@ Contributions are welcome! Please open an issue or submit a pull request for:
 
 For questions, collaborations, or feedback:
 - **GitHub Issues**: [Open an issue](https://github.com/YOUR_USERNAME/electro-thermal-pinn/issues)
-- **Email**: YOUR_EMAIL@example.com
+- **Email**: king.mohamd.09876@gmail.com
 
 ---
 
