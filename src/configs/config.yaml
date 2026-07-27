@@ -2,20 +2,57 @@ problem:
   L: 1.0
   T0: 0.0
   T1: 1.0
-  N_f: 2000          # کاهش از ۵۰۰۰ به ۲۰۰۰
+  N_f: 500
 
 network:
   layers: [2, 50, 50, 50, 50, 3]
 
 training:
   adam_lr: 1e-3
-  adam_iters: 3000   # کاهش از ۵۰۰۰ به ۳۰۰۰
+  adam_iters: 3000
   use_lbfgs: true
 
 inverse:
   enable: true
-  lambda_data: 100.0 # افزایش از ۵۰ به ۱۰۰
+  lambda_data: 100.0
   n_data_points: 500
   noise_level: 0.005
   use_uncertainty: true
   varying_params: true
+
+physics:
+  alpha: 1.0
+  sigma: 1.0
+  rho_c: 1.0
+  mu: 1.0
+  epsilon: 1.0
+
+model:
+  type: "transformer"
+  transformer:
+    input_dim: 2
+    output_dim: 3
+    hidden_size: 128
+    intermediate_size: 256
+    num_hidden_layers: 2
+    num_attention_heads: 4
+    num_key_value_heads: 2
+    head_dim: 32
+    rms_norm_eps: 1e-6
+    hidden_act: "silu"
+    rope_theta: 100.0
+    rope_coord_scale: 1.0
+    use_fourier_features: false
+    fourier_num_frequencies: 8
+    fourier_scale: 5.0
+    attention_bias: false
+    mlp_bias: false
+    attention_dropout: 0.0
+    is_causal: false
+    max_seq_len: 512
+    sigma: 1.0
+    mu: 1.0
+    epsilon: 1.0
+    k_thermal: 1.0
+    rho: 1.0
+    cp: 1.0

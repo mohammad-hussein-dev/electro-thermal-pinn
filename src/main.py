@@ -2,20 +2,10 @@
 Electro-Thermal PINN: Main training script for inverse problems.
 
 This script trains a Physics-Informed Neural Network (PINN) to solve
-the coupled electro-thermal problem:
-    1. Maxwell's equations (1D) for electric and magnetic fields
-    2. Heat equation with Joule heating source term
+the coupled electro-thermal problem with support for multiple architectures.
 
-It also supports inverse problems to identify spatially-varying
-physical parameters from limited observational data.
-
-The script includes:
-    - Reproducibility via fixed random seeds
-    - Early stopping to prevent overfitting
-    - Learning rate scheduling for stable convergence
-    - L-BFGS refinement for final optimization
-    - Comprehensive evaluation metrics (L2 error, MAE, Max error)
-    - Visualization of all predicted fields and parameters
+At startup, the user is prompted to select the desired architecture from a
+professional classification menu.
 """
 
 import os
@@ -30,7 +20,12 @@ torch.manual_seed(42)
 if torch.cuda.is_available():
     torch.cuda.manual_seed_all(42)
 
-from models.electro_thermal_pinn import ElectroThermalPINN
+from models.electro_thermal_pinn import (
+    ElectroThermalPINN,
+    MLPPINN,
+    TransformerPINN,
+    TransformerConfig,
+)
 from physics.varying_parameters import ParameterNetwork
 from training.trainer import compute_loss
 from training.trainer_original import compute_loss_original
@@ -39,6 +34,121 @@ from utils.plotting import plot_electro_thermal_results, plot_varying_parameters
 from utils.config_loader import load_config
 
 
+# =============================================================================
+#  PROFESSIONAL MODEL CLASSIFICATION
+# =============================================================================
+
+def display_model_menu():
+    """
+    Display a clean, professional classification menu for model selection.
+    """
+    print("\n" + "-"*70)
+    print("  PINN MODEL SELECTION")
+    print("-"*70)
+    print("\n  Select the neural network architecture:\n")
+    print("  +---+------------------------+------------------------------------------+")
+    print("  | # | Model                  | Description / Use Case                   |")
+    print("  +---+------------------------+------------------------------------------+")
+    print("  | 1 | MLP                    | Fastest, lowest memory, good baseline   |")
+    print("  |   | (ElectroThermalPINN)   | Quick tests, prototyping                |")
+    print("  +---+------------------------+------------------------------------------+")
+    print("  | 2 | MLPPINN                | Better accuracy, moderate speed         |")
+    print("  |   | (Lightweight Trans.)   | High accuracy on CPU                    |")
+    print("  +---+------------------------+------------------------------------------+")
+    print("  | 3 | TransformerPINN        | Highest accuracy, memory-intensive      |")
+    print("  |   | (Full Attention)       | Research, GPU-accelerated               |")
+    print("  +---+------------------------+------------------------------------------+")
+    print("  | 0 | config.yaml            | Load from configuration file            |")
+    print("  +---+------------------------+------------------------------------------+")
+    print("\n  Legend:")
+    print("    * Speed:     1 (fastest) -> 3 (slowest)")
+    print("    * Memory:    1 (lowest)  -> 3 (highest)")
+    print("    * Accuracy:  1 (good)    -> 3 (highest)")
+    print("-"*70)
+
+
+def select_model_interactive():
+    """
+    Display the interactive menu and get user choice.
+    
+    Returns:
+        int: User's choice (0, 1, 2, 3)
+    """
+    display_model_menu()
+
+    while True:
+        try:
+            choice = input("\n  Enter your choice (0-3): ").strip()
+            if choice in ["0", "1", "2", "3"]:
+                return int(choice)
+            else:
+                print("  Invalid input. Please enter a number between 0 and 3.")
+        except KeyboardInterrupt:
+            print("\n  Exiting...")
+            exit(0)
+        except Exception:
+            print("  Invalid input. Please try again.")
+
+
+def get_model_from_choice(choice, config, device):
+    """
+    Build the model based on the user's choice.
+    
+    Args:
+        choice (int): User's selection (0-3)
+        config (dict): Full configuration dictionary
+        device (torch.device): Device to place the model on
+    
+    Returns:
+        tuple: (model, layers, model_name)
+    """
+    layers_default = config["network"]["layers"]
+
+    if choice == 0:
+        model_type = config.get("model", {}).get("type", "mlp")
+        if model_type == "transformer":
+            print("\n  Using MLPPINN (from config.yaml)")
+            transformer_config_dict = config.get("model", {}).get("transformer", {})
+            cfg = TransformerConfig(**transformer_config_dict)
+            model = MLPPINN(cfg).to(device)
+            return model, None, "MLPPINN (config)"
+        else:
+            print("\n  Using MLP (from config.yaml)")
+            layers = layers_default
+            model = ElectroThermalPINN(layers).to(device)
+            return model, layers, "MLP (config)"
+
+    elif choice == 1:
+        print("\n  Using MLP (ElectroThermalPINN)")
+        print("    Fastest, lowest memory, good for quick tests.")
+        layers = layers_default
+        model = ElectroThermalPINN(layers).to(device)
+        return model, layers, "MLP"
+
+    elif choice == 2:
+        print("\n  Using MLPPINN (Lightweight Transformer)")
+        print("    Better accuracy, moderate speed, recommended for CPU.")
+        transformer_config_dict = config.get("model", {}).get("transformer", {})
+        cfg = TransformerConfig(**transformer_config_dict)
+        model = MLPPINN(cfg).to(device)
+        return model, None, "MLPPINN"
+
+    elif choice == 3:
+        print("\n  Using TransformerPINN (Full Attention)")
+        print("    Highest accuracy, memory-intensive. Recommended for GPU/Research.")
+        transformer_config_dict = config.get("model", {}).get("transformer", {})
+        cfg = TransformerConfig(**transformer_config_dict)
+        model = TransformerPINN(cfg).to(device)
+        return model, None, "TransformerPINN"
+
+    else:
+        raise ValueError(f"Invalid choice: {choice}")
+
+
+# =============================================================================
+#  DATA GENERATION AND EVALUATION FUNCTIONS
+# =============================================================================
+
 def generate_synthetic_data_with_varying_params(
     model,
     param_net,
@@ -46,29 +156,13 @@ def generate_synthetic_data_with_varying_params(
     device: torch.device = None,
     noise_level: float = 0.02,
 ) -> tuple:
-    """
-    Generate synthetic observational data from a reference model.
-
-    This function simulates experimental data by evaluating a pre-trained
-    reference model at random points and optionally adding Gaussian noise.
-
-    Args:
-        model (nn.Module): The reference PINN model.
-        param_net (nn.Module): The reference parameter network (not used directly).
-        n_points (int): Number of data points to generate.
-        device (torch.device): Device to use.
-        noise_level (float): Standard deviation of Gaussian noise.
-
-    Returns:
-        tuple: (x_data, t_data, E_target, H_target, T_target)
-    """
+    """Generate synthetic observational data from a reference model."""
     x_data = torch.rand(n_points, 1, device=device)
     t_data = torch.rand(n_points, 1, device=device)
 
     with torch.no_grad():
         E_target, H_target, T_target = model(x_data, t_data)
 
-    # Add Gaussian noise if specified
     if noise_level > 0:
         E_target += noise_level * torch.randn_like(E_target)
         H_target += noise_level * torch.randn_like(H_target)
@@ -78,28 +172,14 @@ def generate_synthetic_data_with_varying_params(
 
 
 def train_reference_model(device, layers, N_f=2000, epochs=2000):
-    """
-    Train a reference model on the forward problem.
-
-    This model is used to generate synthetic data for the inverse problem.
-    It solves the forward problem with constant parameters.
-
-    Args:
-        device (torch.device): Device to use.
-        layers (list): Network architecture.
-        N_f (int): Number of interior collocation points.
-        epochs (int): Number of training epochs.
-
-    Returns:
-        nn.Module: Trained reference model.
-    """
+    """Train a reference model on the forward problem."""
     model = ElectroThermalPINN(layers).to(device)
     xi_f = sample_interior_points(N_f, device)
     xi_b0, xi_b1 = boundary_points(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
-    print("Training reference model...")
+    print("  Training reference model...")
     for it in range(epochs):
         optimizer.zero_grad()
         total_loss, _, _ = compute_loss_original(model, xi_f, xi_b0, xi_b1)
@@ -107,25 +187,13 @@ def train_reference_model(device, layers, N_f=2000, epochs=2000):
         optimizer.step()
 
         if it % max(1, epochs // 10) == 0:
-            print(f"Reference model: Iter {it:6d}, Loss: {total_loss.item():.3e}")
+            print(f"  Reference model: Iter {it:6d}, Loss: {total_loss.item():.3e}")
 
     return model
 
 
 def evaluate_model(model, param_net, x_test, t_test, device):
-    """
-    Evaluate the model on test points and return predictions.
-
-    Args:
-        model (nn.Module): The PINN model.
-        param_net (nn.Module): The parameter network.
-        x_test (torch.Tensor): Test spatial coordinates.
-        t_test (torch.Tensor): Test temporal coordinates.
-        device (torch.device): Device to use.
-
-    Returns:
-        tuple: (E_pred, H_pred, T_pred, alpha_pred, sigma_pred)
-    """
+    """Evaluate the model on test points and return predictions."""
     model.eval()
     param_net.eval()
 
@@ -143,31 +211,15 @@ def evaluate_model(model, param_net, x_test, t_test, device):
 
 
 def compute_eval_metrics(E_pred, H_pred, T_pred, E_exact, H_exact, T_exact):
-    """
-    Compute evaluation metrics: L2 error, MAE, and max error.
-
-    Args:
-        E_pred (np.ndarray): Predicted electric field.
-        H_pred (np.ndarray): Predicted magnetic field.
-        T_pred (np.ndarray): Predicted temperature.
-        E_exact (np.ndarray): Exact electric field.
-        H_exact (np.ndarray): Exact magnetic field.
-        T_exact (np.ndarray): Exact temperature.
-
-    Returns:
-        dict: Dictionary containing all metrics.
-    """
-    # Relative L2 error (with small epsilon to avoid division by zero)
+    """Compute evaluation metrics: L2 error, MAE, and max error."""
     l2_E = np.sqrt(np.mean((E_pred - E_exact) ** 2)) / (np.sqrt(np.mean(E_exact ** 2)) + 1e-8)
     l2_H = np.sqrt(np.mean((H_pred - H_exact) ** 2)) / (np.sqrt(np.mean(H_exact ** 2)) + 1e-8)
     l2_T = np.sqrt(np.mean((T_pred - T_exact) ** 2)) / (np.sqrt(np.mean(T_exact ** 2)) + 1e-8)
 
-    # Mean Absolute Error
     mae_E = np.mean(np.abs(E_pred - E_exact))
     mae_H = np.mean(np.abs(H_pred - H_exact))
     mae_T = np.mean(np.abs(T_pred - T_exact))
 
-    # Maximum Absolute Error
     max_E = np.max(np.abs(E_pred - E_exact))
     max_H = np.max(np.abs(H_pred - H_exact))
     max_T = np.max(np.abs(T_pred - T_exact))
@@ -179,10 +231,12 @@ def compute_eval_metrics(E_pred, H_pred, T_pred, E_exact, H_exact, T_exact):
     }
 
 
+# =============================================================================
+#  MAIN TRAINING ROUTINE
+# =============================================================================
+
 def main() -> None:
-    """
-    Main training routine.
-    """
+    """Main training routine."""
     # ---- Load configuration ----
     this_dir = os.path.dirname(os.path.abspath(__file__))
     config_path = os.path.join(this_dir, "configs", "config.yaml")
@@ -190,7 +244,7 @@ def main() -> None:
 
     # Problem parameters
     N_f = config["problem"]["N_f"]
-    layers = config["network"]["layers"]
+    layers_default = config["network"]["layers"]
 
     # Training parameters
     adam_lr = float(config["training"]["adam_lr"])
@@ -208,31 +262,41 @@ def main() -> None:
 
     # ---- Device setup ----
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device}")
+    print(f"\n  Using device: {device}")
+
+    # ---- Model selection ----
+    choice = select_model_interactive()
+    model, layers, model_name = get_model_from_choice(choice, config, device)
+    if layers is None:
+        layers = layers_default
+
+    param_net = ParameterNetwork(input_dim=1, output_dim=2).to(device)
+
+    # Display model summary
+    num_params = sum(p.numel() for p in model.parameters())
+    print(f"\n  Selected: {model_name}")
+    print(f"  Total parameters: {num_params:,}")
 
     # ---- Sample collocation and boundary points ----
+    print(f"\n  Sampling {N_f} collocation points...")
     xi_f = sample_interior_points(N_f, device)
     xi_b0, xi_b1 = boundary_points(device)
 
-    # ---- Build models ----
-    model = ElectroThermalPINN(layers).to(device)
-    param_net = ParameterNetwork(input_dim=1, output_dim=2).to(device)
-
     print("\n=== Inverse Problem with Varying Parameters ===")
-    print(f"Varying parameters: {varying_params}")
-    print(f"Use uncertainty: {use_uncertainty}")
-    print(f"Data weight (lambda_data): {lambda_data}")
+    print(f"  Varying parameters: {varying_params}")
+    print(f"  Use uncertainty: {use_uncertainty}")
+    print(f"  Data weight (lambda_data): {lambda_data}")
 
     # ---- Generate synthetic data for inverse problem ----
     data_tuple = None
     if enable_inverse:
-        print("\n" + "="*50)
-        print("Training reference model for data generation...")
-        print("="*50)
+        print("\n" + "=" * 50)
+        print("  Training reference model for data generation...")
+        print("=" * 50)
         reference_model = train_reference_model(device, layers, N_f=2000, epochs=2000)
         reference_param_net = ParameterNetwork(input_dim=1, output_dim=2).to(device)
 
-        print("\nGenerating synthetic data...")
+        print("\n  Generating synthetic data...")
         data_tuple = generate_synthetic_data_with_varying_params(
             reference_model,
             reference_param_net,
@@ -240,7 +304,7 @@ def main() -> None:
             device=device,
             noise_level=noise_level,
         )
-        print(f"Generated {n_data_points} data points with noise level {noise_level}")
+        print(f"  Generated {n_data_points} data points with noise level {noise_level}")
 
     # ---- Optimizer with learning rate scheduler ----
     optimizer = torch.optim.Adam(
@@ -253,7 +317,7 @@ def main() -> None:
 
     # ---- Training loop with early stopping ----
     print("\n=== Adam Training ===")
-    print("="*50)
+    print("=" * 50)
     best_loss = float('inf')
     patience_counter = 0
     patience_limit = 200
@@ -305,9 +369,8 @@ def main() -> None:
     # ---- L-BFGS refinement ----
     if use_lbfgs:
         print("\n=== L-BFGS Refinement ===")
-        print("="*50)
+        print("=" * 50)
 
-        # Load the best model from early stopping
         best_model_path = os.path.join(os.path.dirname(this_dir), "experiments", "best_model.pt")
         if os.path.exists(best_model_path):
             model.load_state_dict(torch.load(best_model_path))
@@ -357,7 +420,7 @@ def main() -> None:
 
     # ---- Evaluation on test set ----
     print("\n=== Evaluation on Test Set ===")
-    print("="*50)
+    print("=" * 50)
 
     x_test_np = np.linspace(0.0, 1.0, 300).reshape(-1, 1)
     t_test_np = np.ones_like(x_test_np) * 0.5
@@ -369,7 +432,6 @@ def main() -> None:
         model, param_net, x_test, t_test, device
     )
 
-    # Generate exact solution from reference model
     if enable_inverse and data_tuple is not None:
         with torch.no_grad():
             E_exact, H_exact, T_exact = reference_model(x_test, t_test)
@@ -377,27 +439,25 @@ def main() -> None:
             H_exact = H_exact.cpu().numpy()
             T_exact = T_exact.cpu().numpy()
     else:
-        # Fallback analytical solution
         E_exact = x_test_np
         H_exact = 0.5 * x_test_np
         T_exact = 0.5 * x_test_np ** 2
 
-    # Compute metrics
     metrics = compute_eval_metrics(E_pred, H_pred, T_pred, E_exact, H_exact, T_exact)
 
-    print("\n📊 Evaluation Metrics:")
-    print(f"  Relative L2 Error:")
-    print(f"    E: {metrics['L2_E']:.4e}")
-    print(f"    H: {metrics['L2_H']:.4e}")
-    print(f"    T: {metrics['L2_T']:.4e}")
-    print(f"\n  Mean Absolute Error (MAE):")
-    print(f"    E: {metrics['MAE_E']:.4e}")
-    print(f"    H: {metrics['MAE_H']:.4e}")
-    print(f"    T: {metrics['MAE_T']:.4e}")
-    print(f"\n  Max Absolute Error:")
-    print(f"    E: {metrics['Max_E']:.4e}")
-    print(f"    H: {metrics['Max_H']:.4e}")
-    print(f"    T: {metrics['Max_T']:.4e}")
+    print("\n  Evaluation Metrics:")
+    print(f"    Relative L2 Error:")
+    print(f"      E: {metrics['L2_E']:.4e}")
+    print(f"      H: {metrics['L2_H']:.4e}")
+    print(f"      T: {metrics['L2_T']:.4e}")
+    print(f"\n    Mean Absolute Error (MAE):")
+    print(f"      E: {metrics['MAE_E']:.4e}")
+    print(f"      H: {metrics['MAE_H']:.4e}")
+    print(f"      T: {metrics['MAE_T']:.4e}")
+    print(f"\n    Max Absolute Error:")
+    print(f"      E: {metrics['Max_E']:.4e}")
+    print(f"      H: {metrics['Max_H']:.4e}")
+    print(f"      T: {metrics['Max_T']:.4e}")
 
     # ---- Plot results ----
     print("\n=== Plotting Results ===")
@@ -420,10 +480,9 @@ def main() -> None:
     np.save(os.path.join(exp_dir, "H_exact.npy"), H_exact)
     np.save(os.path.join(exp_dir, "T_exact.npy"), T_exact)
 
-    # Save metrics
     with open(os.path.join(exp_dir, "eval_metrics.txt"), "w") as f:
         f.write("Evaluation Metrics:\n")
-        f.write("="*50 + "\n")
+        f.write("=" * 50 + "\n")
         f.write(f"Relative L2 Error:\n")
         f.write(f"  E: {metrics['L2_E']:.6e}\n")
         f.write(f"  H: {metrics['L2_H']:.6e}\n")
@@ -438,9 +497,9 @@ def main() -> None:
         f.write(f"  T: {metrics['Max_T']:.6e}\n")
 
     print(f"\nResults saved to: {exp_dir}")
-    print("="*50)
+    print("=" * 50)
     print("PROJECT COMPLETED SUCCESSFULLY!")
-    print("="*50)
+    print("=" * 50)
 
 
 if __name__ == "__main__":

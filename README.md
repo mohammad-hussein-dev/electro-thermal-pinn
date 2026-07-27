@@ -6,6 +6,10 @@
 
 A **Physics-Informed Neural Network (PINN)** framework for solving coupled electromagnetic-thermal problems. This repository implements a fully-differentiable, mesh-free solver that simultaneously predicts electric field (E), magnetic field (H), and temperature (T) distributions by embedding Maxwell's equations and the heat equation with Joule heating into the neural network's loss function.
 
+The framework supports **three neural network architectures** with an interactive selection menu at startup, allowing users to choose the best trade-off between speed, accuracy, and memory usage.
+
+---
+
 ## 📌 Overview
 
 Traditional numerical solvers (FEM, FVM) require mesh generation and iterative solutions for each set of parameters. This PINN-based approach offers:
@@ -23,11 +27,14 @@ Traditional numerical solvers (FEM, FVM) require mesh generation and iterative s
 | **Inverse Problem** | Identify unknown physical parameters from observational data |
 | **Spatially-Varying Parameters** | Predict `α(x)` and `σ(x)` as functions of space |
 | **Uncertainty Quantification** | Variance-based uncertainty estimation |
+| **Model Selection** | Interactive menu to choose between MLP, MLPPINN, or TransformerPINN |
 | **Reproducibility** | Fixed random seeds for consistent results |
 | **Early Stopping** | Prevents overfitting with patience-based stopping |
 | **Learning Rate Scheduling** | Adaptive LR for stable convergence |
 | **L-BFGS Refinement** | Final optimization for higher accuracy |
 | **Comprehensive Metrics** | L2 error, MAE, Max error |
+
+---
 
 ## 🔬 Governing Equations
 
@@ -60,6 +67,8 @@ Q = σ · E²
 - `μ` = Magnetic permeability
 - `ε` = Electric permittivity
 
+---
+
 ## 🧠 Methodology
 
 ### Physics-Informed Neural Networks
@@ -77,41 +86,58 @@ Where:
 
 All derivatives are computed via **automatic differentiation** (PyTorch's `autograd`), eliminating the need for mesh generation or numerical differentiation.
 
-### Network Architecture
+---
 
-| Component | Architecture | Details |
-|-----------|--------------|---------|
-| **Main PINN** | Fully-Connected | Input: (x, t) → Output: (E, H, T) |
-| **Parameter Network** | Fully-Connected | Input: (x) → Output: (α(x), σ(x)) |
-| **Activation** | Tanh | Hidden layers |
-| **Output Activation** | Linear (main) / Softplus (params) | Unbounded / Positive outputs |
-| **Initialization** | Xavier | Stable training |
+## 🏗️ Model Architectures
 
-### Training Strategy
+The framework provides **three architectures** with an interactive selection menu at startup:
 
-1. **Adam Optimizer** (initial training)
-2. **ReduceLROnPlateau** (adaptive learning rate)
-3. **Early Stopping** (prevents overfitting)
-4. **L-BFGS** (final refinement for higher accuracy)
+| # | Model | Description | Speed | Memory | Accuracy |
+|:-:|-------|-------------|:-----:|:------:|:--------:|
+| 1 | **MLP** (ElectroThermalPINN) | Fully-connected network with Tanh activation. Lightweight baseline. | ⚡⚡⚡⚡⚡ | 💾💾 | 🎯🎯🎯 |
+| 2 | **MLPPINN** (Lightweight Transformer) | Transformer-style without attention. Uses Fourier features, RMSNorm, and SwiGLU. | ⚡⚡⚡⚡ | 💾💾💾 | 🎯🎯🎯🎯 |
+| 3 | **TransformerPINN** (Full Attention) | Full Transformer with attention, RoPE, GQA. Highest accuracy, memory-intensive. | ⚡⚡ | 💾💾💾💾💾 | 🎯🎯🎯🎯🎯 |
+| 0 | **config.yaml** | Load architecture from configuration file. | — | — | — |
+
+### Architecture Details
+
+| Component | MLP | MLPPINN | TransformerPINN |
+|-----------|-----|---------|-----------------|
+| **Core** | Linear layers + Tanh | Fourier features + RMSNorm + SwiGLU | Multi-head self-attention + RoPE + GQA |
+| **Parameters** | ~8,000 | ~100,000+ | ~500,000+ |
+| **Training Time (CPU)** | ~5 min | ~8 min | >30 min (GPU recommended) |
+
+---
 
 ## 📊 Results
 
-### Evaluation Metrics
+### Evaluation Metrics (MLP – Default)
 
 | Metric | E (Electric) | H (Magnetic) | T (Temperature) |
 |--------|--------------|--------------|-----------------|
-| **Relative L2 Error** | 9.23e-04 | 6.39e-03 | 1.53e-03 |
-| **MAE** | 2.47e-04 | 3.15e-04 | 7.70e-04 |
-| **Max Error** | 5.61e-04 | 7.45e-04 | 2.03e-03 |
+| **Relative L2 Error** | 9.09e-04 | 2.43e-03 | 1.42e-03 |
+| **MAE** | 1.96e-04 | 3.24e-04 | 7.02e-04 |
+| **Max Error** | 3.29e-04 | 6.78e-04 | 2.11e-03 |
+
+### Evaluation Metrics (MLPPINN – Lightweight Transformer)
+
+| Metric | E (Electric) | H (Magnetic) | T (Temperature) |
+|--------|--------------|--------------|-----------------|
+| **Relative L2 Error** | 2.25e-03 | 2.20e-03 | 1.03e-03 |
+| **MAE** | 6.25e-04 | 2.10e-04 | 4.20e-04 |
+| **Max Error** | 1.74e-03 | 5.90e-04 | 1.70e-03 |
+
+> **Note**: MLP is faster and more accurate for the electric field (E), while MLPPINN offers better accuracy for magnetic field (H) and temperature (T).
 
 ### Visualizations
 
-The training script automatically generates:
-
-1. **Electro-Thermal Results**: Plots of E, H, T fields
-2. **Varying Parameters**: Plots of α(x) and σ(x)
+The training script automatically generates plots of:
+- **Electro-Thermal Results**: E, H, T fields
+- **Varying Parameters**: α(x) and σ(x) distributions
 
 All figures are saved in `experiments/figures/`.
+
+---
 
 ## 📂 Project Structure
 
@@ -119,7 +145,7 @@ All figures are saved in `experiments/figures/`.
 electro-thermal-pinn/
 ├── src/
 │   ├── models/
-│   │   └── electro_thermal_pinn.py      # Main PINN architecture
+│   │   └── electro_thermal_pinn.py      # All three model architectures
 │   ├── physics/
 │   │   ├── maxwell_pde.py               # Maxwell's equations residuals
 │   │   ├── heat_pde.py                  # Heat equation with Joule heating
@@ -134,7 +160,7 @@ electro-thermal-pinn/
 │   │   └── config_loader.py             # YAML configuration loader
 │   ├── configs/
 │   │   └── config.yaml                  # Hyperparameter configuration
-│   └── main.py                          # Main training script
+│   └── main.py                          # Main training script (with model selection menu)
 ├── experiments/
 │   ├── figures/                         # Generated plots
 │   ├── results/                         # .npy prediction files
@@ -144,7 +170,9 @@ electro-thermal-pinn/
 └── requirements.txt
 ```
 
-## 🛠️ Installation
+---
+
+## 🛠 Installation
 
 ### Prerequisites
 
@@ -155,7 +183,7 @@ electro-thermal-pinn/
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR_USERNAME/electro-thermal-pinn.git
+git clone https://github.com/mohammad-hussein-dev/electro-thermal-pinn.git
 cd electro-thermal-pinn
 
 # Create virtual environment
@@ -175,6 +203,8 @@ matplotlib>=3.7.0
 pyyaml>=6.0
 ```
 
+---
+
 ## 🚀 Usage
 
 ### Run Training
@@ -183,16 +213,41 @@ pyyaml>=6.0
 python src/main.py
 ```
 
+Upon execution, an interactive model selection menu will appear:
+
+```
+----------------------------------------------------------------------
+  PINN MODEL SELECTION
+----------------------------------------------------------------------
+
+  Select the neural network architecture:
+
+  +---+------------------------+------------------------------------------+
+  | # | Model                  | Description / Use Case                   |
+  +---+------------------------+------------------------------------------+
+  | 1 | MLP                    | Fastest, lowest memory, good baseline   |
+  |   | (ElectroThermalPINN)   | Quick tests, prototyping                |
+  +---+------------------------+------------------------------------------+
+  | 2 | MLPPINN                | Better accuracy, moderate speed         |
+  |   | (Lightweight Trans.)   | High accuracy on CPU                    |
+  +---+------------------------+------------------------------------------+
+  | 3 | TransformerPINN        | Highest accuracy, memory-intensive      |
+  |   | (Full Attention)       | Research, GPU-accelerated               |
+  +---+------------------------+------------------------------------------+
+  | 0 | config.yaml            | Load from configuration file            |
+  +---+------------------------+------------------------------------------+
+```
+
 ### Configuration
 
-All hyperparameters are managed via `src/configs/config.yaml`:
+Default configuration (`src/configs/config.yaml`):
 
 ```yaml
 problem:
-  N_f: 2000              # Number of collocation points
+  N_f: 500                  # Number of collocation points
 
 network:
-  layers: [2, 50, 50, 50, 50, 3]  # Architecture
+  layers: [2, 50, 50, 50, 50, 3]  # MLP architecture
 
 training:
   adam_lr: 1e-3
@@ -201,18 +256,29 @@ training:
 
 inverse:
   enable: true
-  lambda_data: 100.0     # Weight for data loss
+  lambda_data: 100.0
   n_data_points: 500
   noise_level: 0.005
   use_uncertainty: true
   varying_params: true
+
+model:
+  type: "transformer"       # "mlp" or "transformer" (MLPPINN)
+  transformer:
+    hidden_size: 128
+    num_hidden_layers: 2
+    use_fourier_features: false
+    max_seq_len: 512
 ```
 
 ### Customization
 
+- **Model Selection**: Use the interactive menu or set `model.type` in `config.yaml`
+- **Accuracy vs Speed**: Adjust `N_f`, `hidden_size`, and `num_hidden_layers`
 - **Forward Problem Only**: Set `enable: false` under `inverse`
-- **Adjust Accuracy**: Increase `N_f` and `adam_iters` for higher precision
 - **Different Physics**: Modify PDE residuals in `src/physics/`
+
+---
 
 ## 🔬 Inverse Problem Capabilities
 
@@ -224,20 +290,7 @@ This framework supports **inverse problems** to identify unknown physical parame
 
 This capability is critical for applications where direct measurement of material properties is expensive or impossible.
 
-## 📈 Example Output
-
-```
-📊 Evaluation Metrics:
-  Relative L2 Error:
-    E: 9.2266e-04
-    H: 6.3861e-03
-    T: 1.5291e-03
-
-  Mean Absolute Error (MAE):
-    E: 2.4665e-04
-    H: 3.1498e-04
-    T: 7.7009e-04
-```
+---
 
 ## 🎯 Applications
 
@@ -249,6 +302,8 @@ This framework is suitable for:
 - **Electroslag Remelting**: Electromagnetic field prediction
 - **MHD Flows**: Joule heating effects in magnetohydrodynamics
 
+---
+
 ## 📚 References
 
 1. Raissi, M., Perdikaris, P., & Karniadakis, G. E. (2019). *Physics-informed neural networks: A deep learning framework for solving forward and inverse problems involving nonlinear partial differential equations.* Journal of Computational Physics.
@@ -257,9 +312,13 @@ This framework is suitable for:
 
 3. *Physics-Informed Neural Networks for Multiphysics Simulations: Application to Coupled Electromagnetic-Thermal Modeling.* IEEE Access, 2023.
 
+---
+
 ## 📝 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
 
 ## 🤝 Contributing
 
@@ -269,11 +328,14 @@ Contributions are welcome! Please open an issue or submit a pull request for:
 - Additional test cases
 - Documentation enhancements
 
+---
+
 ## 📧 Contact
 
 For questions, collaborations, or feedback:
-- **GitHub Issues**: [Open an issue](https://github.com/YOUR_USERNAME/electro-thermal-pinn/issues)
+- **GitHub Issues**: [Open an issue](https://github.com/mohammad-hussein-dev/electro-thermal-pinn/issues)
 - **Email**: king.mohamd.09876@gmail.com
+- **LinkedIn**: [mohammad-hussein-dev](https://linkedin.com/in/mohammad-hussein-dev)
 
 ---
 
