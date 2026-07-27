@@ -1,4 +1,3 @@
-```markdown
 # Electro-Thermal PINN: Physics-Informed Neural Networks for Coupled Electromagnetic-Thermal Problems
 
 [![Python Version](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org/downloads/)
@@ -346,4 +345,3 @@ For questions, collaborations, or feedback:
 ---
 
 ⭐ If you find this project useful for your research or work, please consider giving it a star on GitHub!
-```
