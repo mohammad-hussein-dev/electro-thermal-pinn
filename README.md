@@ -1,3 +1,4 @@
+```markdown
 # Electro-Thermal PINN: Physics-Informed Neural Networks for Coupled Electromagnetic-Thermal Problems
 
 [![Python Version](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org/downloads/)
@@ -304,6 +305,21 @@ This framework is suitable for:
 
 ---
 
+## 🤝 Contributors
+
+We would like to thank the following contributors for their valuable work on this project:
+
+- **[SMNRFD](https://github.com/SMNRFD)** – Designed and implemented the full **TransformerPINN** architecture, including:
+  - Rotary Position Embedding (RoPE)
+  - Grouped-Query Attention (GQA)
+  - SwiGLU gated MLP
+  - Fourier feature coordinate embedding
+  - RMSNorm with pre-norm residuals
+
+This collaboration significantly enhanced the model's accuracy and scalability, especially for magnetic field (H) and temperature (T) predictions.
+
+---
+
 ## 📚 References
 
 1. Raissi, M., Perdikaris, P., & Karniadakis, G. E. (2019). *Physics-informed neural networks: A deep learning framework for solving forward and inverse problems involving nonlinear partial differential equations.* Journal of Computational Physics.
@@ -320,16 +336,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-## 🤝 Contributing
-
-Contributions are welcome! Please open an issue or submit a pull request for:
-- New physics modules
-- Performance improvements
-- Additional test cases
-- Documentation enhancements
-
----
-
 ## 📧 Contact
 
 For questions, collaborations, or feedback:
@@ -340,3 +346,4 @@ For questions, collaborations, or feedback:
 ---
 
 ⭐ If you find this project useful for your research or work, please consider giving it a star on GitHub!
+```
