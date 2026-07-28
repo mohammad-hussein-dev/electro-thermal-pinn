@@ -4,8 +4,18 @@ Electro-Thermal PINN: Main training script for inverse problems.
 This script trains a Physics-Informed Neural Network (PINN) to solve
 the coupled electro-thermal problem with support for multiple architectures.
 
-At startup, the user is prompted to select the desired architecture from a
-professional classification menu.
+Supported model types:
+    - "mlp": Standard fully-connected network (default, lightweight)
+    - "transformer": Advanced attention-based network with Fourier features
+
+The script includes:
+    - Interactive model selection menu
+    - Reproducibility via fixed random seeds
+    - Early stopping to prevent overfitting
+    - Learning rate scheduling for stable convergence
+    - L-BFGS refinement for final optimization
+    - Comprehensive evaluation metrics (L2 error, MAE, Max error)
+    - High-quality visualization with professional styling
 """
 
 import os
@@ -22,7 +32,6 @@ if torch.cuda.is_available():
 
 from models.electro_thermal_pinn import (
     ElectroThermalPINN,
-    MLPPINN,
     TransformerPINN,
     TransformerConfig,
 )
@@ -35,10 +44,10 @@ from utils.config_loader import load_config
 
 
 # =============================================================================
-#  PROFESSIONAL MODEL CLASSIFICATION
+#  MODEL SELECTION MENU
 # =============================================================================
 
-def display_model_menu():
+def display_model_menu() -> None:
     """
     Display a clean, professional classification menu for model selection.
     """
@@ -67,10 +76,10 @@ def display_model_menu():
     print("-"*70)
 
 
-def select_model_interactive():
+def select_model_interactive() -> int:
     """
     Display the interactive menu and get user choice.
-    
+
     Returns:
         int: User's choice (0, 1, 2, 3)
     """
@@ -90,15 +99,15 @@ def select_model_interactive():
             print("  Invalid input. Please try again.")
 
 
-def get_model_from_choice(choice, config, device):
+def get_model_from_choice(choice: int, config: dict, device: torch.device):
     """
     Build the model based on the user's choice.
-    
+
     Args:
         choice (int): User's selection (0-3)
         config (dict): Full configuration dictionary
         device (torch.device): Device to place the model on
-    
+
     Returns:
         tuple: (model, layers, model_name)
     """
@@ -110,7 +119,7 @@ def get_model_from_choice(choice, config, device):
             print("\n  Using MLPPINN (from config.yaml)")
             transformer_config_dict = config.get("model", {}).get("transformer", {})
             cfg = TransformerConfig(**transformer_config_dict)
-            model = MLPPINN(cfg).to(device)
+            model = TransformerPINN(cfg).to(device)
             return model, None, "MLPPINN (config)"
         else:
             print("\n  Using MLP (from config.yaml)")
@@ -130,7 +139,7 @@ def get_model_from_choice(choice, config, device):
         print("    Better accuracy, moderate speed, recommended for CPU.")
         transformer_config_dict = config.get("model", {}).get("transformer", {})
         cfg = TransformerConfig(**transformer_config_dict)
-        model = MLPPINN(cfg).to(device)
+        model = TransformerPINN(cfg).to(device)
         return model, None, "MLPPINN"
 
     elif choice == 3:
@@ -229,6 +238,33 @@ def compute_eval_metrics(E_pred, H_pred, T_pred, E_exact, H_exact, T_exact):
         'MAE_E': mae_E, 'MAE_H': mae_H, 'MAE_T': mae_T,
         'Max_E': max_E, 'Max_H': max_H, 'Max_T': max_T
     }
+
+
+def build_model(config, device):
+    """
+    Build the model based on the configuration.
+
+    Args:
+        config (dict): Full configuration dictionary.
+        device (torch.device): Device to place the model on.
+
+    Returns:
+        tuple: (model, layers) where layers is only used for MLP.
+    """
+    model_type = config.get("model", {}).get("type", "mlp")
+
+    if model_type == "transformer":
+        print("🚀 Using TransformerPINN architecture")
+        transformer_config_dict = config.get("model", {}).get("transformer", {})
+        cfg = TransformerConfig(**transformer_config_dict)
+        model = TransformerPINN(cfg).to(device)
+        layers = None
+    else:
+        print("📊 Using MLP (ElectroThermalPINN) architecture")
+        layers = config["network"]["layers"]
+        model = ElectroThermalPINN(layers).to(device)
+
+    return model, layers
 
 
 # =============================================================================
@@ -432,6 +468,7 @@ def main() -> None:
         model, param_net, x_test, t_test, device
     )
 
+    # Generate exact solution from reference model
     if enable_inverse and data_tuple is not None:
         with torch.no_grad():
             E_exact, H_exact, T_exact = reference_model(x_test, t_test)
@@ -439,10 +476,12 @@ def main() -> None:
             H_exact = H_exact.cpu().numpy()
             T_exact = T_exact.cpu().numpy()
     else:
+        # Fallback analytical solution
         E_exact = x_test_np
         H_exact = 0.5 * x_test_np
         T_exact = 0.5 * x_test_np ** 2
 
+    # Compute metrics
     metrics = compute_eval_metrics(E_pred, H_pred, T_pred, E_exact, H_exact, T_exact)
 
     print("\n  Evaluation Metrics:")
@@ -459,10 +498,22 @@ def main() -> None:
     print(f"      H: {metrics['Max_H']:.4e}")
     print(f"      T: {metrics['Max_T']:.4e}")
 
-    # ---- Plot results ----
+    # ---- Plot results (with display) ----
     print("\n=== Plotting Results ===")
-    plot_electro_thermal_results(x_test_np, E_pred, H_pred, T_pred)
-    plot_varying_parameters(x_test_np, alpha_pred, sigma_pred)
+
+    # Plot electro-thermal results with exact values and show=True
+    plot_electro_thermal_results(
+        x_test_np, E_pred, H_pred, T_pred,
+        E_exact=E_exact, H_exact=H_exact, T_exact=T_exact,
+        show=True
+    )
+
+    # Plot varying parameters with show=True
+    plot_varying_parameters(
+        x_test_np, alpha_pred, sigma_pred,
+        alpha_exact=None, sigma_exact=None,
+        show=True
+    )
 
     # ---- Save results ----
     exp_dir = os.path.join(os.path.dirname(this_dir), "experiments")
@@ -480,6 +531,7 @@ def main() -> None:
     np.save(os.path.join(exp_dir, "H_exact.npy"), H_exact)
     np.save(os.path.join(exp_dir, "T_exact.npy"), T_exact)
 
+    # Save metrics
     with open(os.path.join(exp_dir, "eval_metrics.txt"), "w") as f:
         f.write("Evaluation Metrics:\n")
         f.write("=" * 50 + "\n")
