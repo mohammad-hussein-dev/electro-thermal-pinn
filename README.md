@@ -33,6 +33,7 @@ Traditional numerical solvers (FEM, FVM) require mesh generation and iterative s
 | **Learning Rate Scheduling** | Adaptive LR for stable convergence |
 | **L-BFGS Refinement** | Final optimization for higher accuracy |
 | **Comprehensive Metrics** | L2 error, MAE, Max error |
+| **Interactive Dashboard** | Streamlit-based UI for live parameter exploration and visualization |
 
 ---
 
@@ -99,14 +100,6 @@ The framework provides **three architectures** with an interactive selection men
 | 3 | **TransformerPINN** (Full Attention) | Full Transformer with attention, RoPE, GQA. Highest accuracy, memory-intensive. | ⚡⚡ | 💾💾💾💾💾 | 🎯🎯🎯🎯🎯 |
 | 0 | **config.yaml** | Load architecture from configuration file. | — | — | — |
 
-### Architecture Details
-
-| Component | MLP | MLPPINN | TransformerPINN |
-|-----------|-----|---------|-----------------|
-| **Core** | Linear layers + Tanh | Fourier features + RMSNorm + SwiGLU | Multi-head self-attention + RoPE + GQA |
-| **Parameters** | ~8,000 | ~100,000+ | ~500,000+ |
-| **Training Time (CPU)** | ~5 min | ~8 min | >30 min (GPU recommended) |
-
 ---
 
 ## 📊 Results
@@ -129,42 +122,37 @@ The framework provides **three architectures** with an interactive selection men
 
 > **Note**: MLP is faster and more accurate for the electric field (E), while MLPPINN offers better accuracy for magnetic field (H) and temperature (T).
 
-### Visualizations
-
-The training script automatically generates plots of:
-- **Electro-Thermal Results**: E, H, T fields
-- **Varying Parameters**: α(x) and σ(x) distributions
-
-All figures are saved in `experiments/figures/`.
-
 ---
 
 ## 📂 Project Structure
 
 ```
 electro-thermal-pinn/
+├── app.py                             # Streamlit dashboard
+├── train_for_dashboard.py             # Quick training script for dashboard models
 ├── src/
+│   ├── main.py                        # Unified entry point (menu for dashboard/terminal)
+│   ├── main_terminal.py               # Terminal-based training with model selection
 │   ├── models/
-│   │   └── electro_thermal_pinn.py      # All three model architectures
+│   │   └── electro_thermal_pinn.py    # All three model architectures
 │   ├── physics/
-│   │   ├── maxwell_pde.py               # Maxwell's equations residuals
-│   │   ├── heat_pde.py                  # Heat equation with Joule heating
-│   │   ├── boundary_conditions.py       # Dirichlet BCs
-│   │   └── varying_parameters.py        # Parameter network for α(x), σ(x)
+│   │   ├── maxwell_pde.py             # Maxwell's equations residuals
+│   │   ├── heat_pde.py                # Heat equation with Joule heating
+│   │   ├── boundary_conditions.py     # Dirichlet BCs
+│   │   └── varying_parameters.py      # Parameter network for α(x), σ(x)
 │   ├── training/
-│   │   ├── trainer.py                   # Loss function with UQ
-│   │   └── trainer_original.py          # Forward problem trainer
+│   │   ├── trainer.py                 # Loss function with UQ
+│   │   └── trainer_original.py        # Forward problem trainer
 │   ├── utils/
-│   │   ├── data_sampling.py             # Collocation & boundary points
-│   │   ├── plotting.py                  # Visualization utilities
-│   │   └── config_loader.py             # YAML configuration loader
-│   ├── configs/
-│   │   └── config.yaml                  # Hyperparameter configuration
-│   └── main.py                          # Main training script (with model selection menu)
+│   │   ├── data_sampling.py           # Collocation & boundary points
+│   │   ├── plotting.py                # Visualization utilities
+│   │   └── config_loader.py           # YAML configuration loader
+│   └── configs/
+│       └── config.yaml                # Hyperparameter configuration
 ├── experiments/
-│   ├── figures/                         # Generated plots
-│   ├── results/                         # .npy prediction files
-│   └── saved_models/                    # Trained model weights
+│   ├── figures/                       # Generated plots
+│   ├── results/                       # .npy prediction files
+│   └── saved_models/                  # Trained model weights
 ├── README.md
 ├── LICENSE
 └── requirements.txt
@@ -201,19 +189,46 @@ torch>=2.0.0
 numpy>=1.24.0
 matplotlib>=3.7.0
 pyyaml>=6.0
+streamlit>=1.28.0
 ```
 
 ---
 
 ## 🚀 Usage
 
-### Run Training
+### Main Menu
 
 ```bash
 python src/main.py
 ```
 
-Upon execution, an interactive model selection menu will appear:
+This command launches a unified menu with two execution modes:
+
+```
+======================================================================
+  ⚡ ELECTRO-THERMAL PINN - MAIN MENU
+======================================================================
+
+  +---+--------------------------------------------+
+  | # | Mode                                       |
+  +---+--------------------------------------------+
+  | 1 | Dashboard (Streamlit)                      |
+  |   | Interactive UI for employers & clients    |
+  +---+--------------------------------------------+
+  | 2 | Terminal Mode                              |
+  |   | Command-line with architecture selection  |
+  +---+--------------------------------------------+
+  | 0 | Exit                                      |
+  +---+--------------------------------------------+
+```
+
+- **Option 1**: Launches the Streamlit dashboard for interactive parameter exploration and visualization.
+- **Option 2**: Enters the terminal-based training mode with architecture selection.
+- **Option 0**: Exits the application.
+
+### Terminal Mode
+
+After selecting option `2`, you will see the architecture selection menu:
 
 ```
 ----------------------------------------------------------------------
@@ -240,7 +255,7 @@ Upon execution, an interactive model selection menu will appear:
 
 ### Configuration
 
-Default configuration (`src/configs/config.yaml`):
+All hyperparameters are managed via `src/configs/config.yaml`:
 
 ```yaml
 problem:
@@ -277,6 +292,22 @@ model:
 - **Accuracy vs Speed**: Adjust `N_f`, `hidden_size`, and `num_hidden_layers`
 - **Forward Problem Only**: Set `enable: false` under `inverse`
 - **Different Physics**: Modify PDE residuals in `src/physics/`
+
+---
+
+## 📊 Interactive Dashboard
+
+The Streamlit dashboard (`app.py`) provides a visual interface for exploring model predictions. It is launched from the main menu (Option 1).
+
+**Features:**
+- **Model Architecture Selection**: Choose between MLP, MLPPINN, and TransformerPINN.
+- **Parameter Adjustment**: Adjust spatial domain (`x_min`, `x_max`) and time (`t`).
+- **Live Inference**: Run the model with the selected parameters and see plots for:
+    - Electric field (E)
+    - Magnetic field (H)
+    - Temperature (T)
+    - Spatially-varying parameters (α(x), σ(x))
+- **Metrics Display**: View mean, standard deviation, min, and max for each field.
 
 ---
 
