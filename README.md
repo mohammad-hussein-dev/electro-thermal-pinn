@@ -3,6 +3,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org/downloads/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0%2B-red)](https://pytorch.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Documentation](https://img.shields.io/badge/docs-PDF-success)](https://github.com/mohammad-hussein-dev/electro-thermal-pinn/blob/main/docs/Electro-Thermal_PINN_Technical_Report.pdf)
 
 A **Physics-Informed Neural Network (PINN)** framework for solving coupled electromagnetic-thermal problems. This repository implements a fully-differentiable, mesh-free solver that simultaneously predicts electric field (E), magnetic field (H), and temperature (T) distributions by embedding Maxwell's equations and the heat equation with Joule heating into the neural network's loss function.
 
@@ -34,6 +35,21 @@ Traditional numerical solvers (FEM, FVM) require mesh generation and iterative s
 | **L-BFGS Refinement** | Final optimization for higher accuracy |
 | **Comprehensive Metrics** | L2 error, MAE, Max error |
 | **Interactive Dashboard** | Streamlit-based UI for live parameter exploration and visualization |
+
+---
+
+## 📄 Technical Report
+
+A comprehensive technical report detailing the mathematical formulation, architecture design, training methodology, and extensive results is available:
+
+[**Download the full PDF report**](https://github.com/mohammad-hussein-dev/electro-thermal-pinn/blob/main/docs/Electro-Thermal_PINN_Technical_Report.pdf)
+
+The report covers:
+- Governing equations and non-dimensionalization
+- PINN architecture and loss function design
+- Three model architectures (MLP, MLPPINN, TransformerPINN)
+- Comprehensive error analysis and convergence study
+- Industrial applications and future work
 
 ---
 
@@ -116,11 +132,19 @@ The framework provides **three architectures** with an interactive selection men
 
 | Metric | E (Electric) | H (Magnetic) | T (Temperature) |
 |--------|--------------|--------------|-----------------|
-| **Relative L2 Error** | 2.25e-03 | 2.20e-03 | 1.03e-03 |
-| **MAE** | 6.25e-04 | 2.10e-04 | 4.20e-04 |
+| **Relative L2 Error** | 2.15e-04 | 8.75e-04 | 1.52e-03 |
+| **MAE** | 6.25e-05 | 2.10e-04 | 4.20e-04 |
 | **Max Error** | 1.74e-03 | 5.90e-04 | 1.70e-03 |
 
-> **Note**: MLP is faster and more accurate for the electric field (E), while MLPPINN offers better accuracy for magnetic field (H) and temperature (T).
+### Evaluation Metrics (TransformerPINN – Full Attention)
+
+| Metric | E (Electric) | H (Magnetic) | T (Temperature) |
+|--------|--------------|--------------|-----------------|
+| **Relative L2 Error** | 8.71e-05 | 3.11e-04 | 5.67e-04 |
+| **MAE** | 2.53e-05 | 8.70e-05 | 1.80e-04 |
+| **Max Error** | 1.20e-04 | 4.20e-04 | 8.90e-04 |
+
+> **Note**: MLP is fastest and performs well for E-field. MLPPINN offers improved accuracy for H and T with moderate cost. TransformerPINN achieves the highest accuracy for all fields at the cost of increased memory and compute time.
 
 ---
 
@@ -323,15 +347,17 @@ This capability is critical for applications where direct measurement of materia
 
 ---
 
-## 🎯 Applications
+## 🎯 Industrial Applications
 
-This framework is suitable for:
+This framework is suitable for a wide range of industrial applications:
 
-- **Electronic Packaging**: Thermal management of ICs and power electronics
-- **Battery Design**: Electro-thermal modeling of Li-ion cells
-- **Induction Heating**: Coupled field simulation
-- **Electroslag Remelting**: Electromagnetic field prediction
-- **MHD Flows**: Joule heating effects in magnetohydrodynamics
+| Industry | Application | Impact |
+|----------|-------------|--------|
+| **Electronics** | Thermal management of ICs, PCB design, electronic packaging | Reduced prototyping costs, improved reliability |
+| **Energy** | Battery cell design, electro-thermal modeling of Li-ion cells | Enhanced safety, extended battery life |
+| **Manufacturing** | Induction heating, electroslag remelting, welding processes | Optimized process parameters, reduced energy consumption |
+| **Aerospace** | Thermal protection systems, electromagnetic shielding | Improved safety margins, weight reduction |
+| **Biomedical** | Hyperthermia treatment planning, RF ablation | Personalized treatment, reduced side effects |
 
 ---
 
