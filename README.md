@@ -361,18 +361,11 @@ This framework is suitable for a wide range of industrial applications:
 
 ---
 
-## 🤝 Contributors
+## 🤝 Acknowledgments
 
-We would like to thank the following contributors for their valuable work on this project:
+Special thanks to **[SMNRFD](https://github.com/SMNRFD)** for the original idea and conceptual direction behind the TransformerPINN architecture — proposing the use of attention-based components (RoPE, GQA, SwiGLU, Fourier feature embeddings) for this problem.
 
-- **[SMNRFD](https://github.com/SMNRFD)** – Designed and implemented the full **TransformerPINN** architecture, including:
-  - Rotary Position Embedding (RoPE)
-  - Grouped-Query Attention (GQA)
-  - SwiGLU gated MLP
-  - Fourier feature coordinate embedding
-  - RMSNorm with pre-norm residuals
-
-This collaboration significantly enhanced the model's accuracy and scalability, especially for magnetic field (H) and temperature (T) predictions.
+Building on that direction, the full architecture design, implementation, hyperparameter tuning, and integration into the physics-informed training pipeline were carried out independently — including adapting these components to satisfy the PDE-constrained loss function and ensuring numerical stability during training.
 
 ---
 
