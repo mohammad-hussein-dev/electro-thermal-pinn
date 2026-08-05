@@ -1,8 +1,36 @@
-title: "Electro-Thermal PINN: A Mesh-Free Solver for Coupled Maxwell's Equations and Heat Transfer"
-author: "Mohammad Hussein Ghafoori"
+---
+title: "Electro-Thermal PINN"
+subtitle: "A Mesh-Free Solver for Coupled Maxwell's Equations and Heat Transfer"
+author: |
+  Mohammad Hussein Ghafoori \\
+  \href{mailto:king.mohamd.09876@gmail.com}{king.mohamd.09876@gmail.com} \\
+  \href{https://github.com/mohammad-hussein-dev}{GitHub} \quad
+  \href{https://linkedin.com/in/mohammad-hussein-dev}{LinkedIn} \quad
+  \href{https://mohammad-hussein-dev.github.io}{Portfolio}
+institute: "Backend & AI Engineer | Physics-Inspired Problem Solver"
 date: "July 31, 2026"
 keywords: "PINN, Physics-Informed Neural Networks, Maxwell's Equations, Heat Transfer, Joule Heating, TransformerPINN, MLP, MLPPINN, RoPE, GQA, SwiGLU, Mesh-Free Solver, Deep Learning, Scientific Machine Learning"
 subject: "Multi-Physics Simulation with Physics-Informed Neural Networks"
+titlepage: true
+titlepage-color: "1e81b0"
+titlepage-text-color: "FFFFFF"
+titlepage-rule-color: "FFFFFF"
+titlepage-rule-height: 2
+toc: true
+toc-depth: 2
+lof: false
+lot: false
+geometry: margin=2.5cm
+fontsize: 11pt
+linkcolor: "1e81b0"
+urlcolor: "1e81b0"
+toccolor: "1e81b0"
+header-includes:
+  - \usepackage{fontawesome5}
+  - \usepackage{hyperref}
+  - \hypersetup{colorlinks=true, linkcolor=1e81b0, urlcolor=1e81b0}
+  - \usepackage{xcolor}
+  - \definecolor{myblue}{HTML}{1e81b0}
 ---
 
 # Electro-Thermal PINN: A Mesh-Free Solver for Coupled Maxwell's Equations and Heat Transfer
@@ -473,4 +501,4 @@ This project is open-source and available under the MIT License.
 **Prepared by:** Mohammad Hussein Ghafoori  
 **Date:** July 31, 2026  
 **Version:** 1.0  
-**Status:** Production-Ready [x]
+**Status:** Production-Ready
